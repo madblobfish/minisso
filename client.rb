@@ -3,7 +3,7 @@ require 'rack-cas'
 require 'rack/cas'
 
 set :sessions, path: '/', secret: SecureRandom.hex(32) #, key: '__Host-Session', secure: true
-use Rack::CAS, server_url: 'https://localhost:8081/', verify_ssl_cert: false
+use Rack::CAS, server_url: 'https://localhost:8081/cas', verify_ssl_cert: false
 
 before do
   unless session['cas'] && session['cas']['user']

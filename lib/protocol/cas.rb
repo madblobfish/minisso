@@ -1,0 +1,105 @@
+# https://apereo.github.io/cas/6.3.x/protocol/CAS-Protocol-Specification.html
+require_relative 'base.rb'
+require 'securerandom'
+
+class CAS < ProtocolBase
+  def initialize(app = nil)
+    super
+    @cas_tickets = {}
+  end
+  def ticket_make(username, service, time=Time.now)
+    rnd = 'ST-'+SecureRandom.alphanumeric(28)
+    @cas_tickets[rnd] = {t:time, u:username, s:service}
+    if @cas_tickets.length >= 100
+      @cas_tickets.keys[50..-1].each{|k|@cas_tickets.delete(k)}
+    end
+    @cas_tickets.keys
+    rnd
+  end
+  def ticket_validate(ticket, service, time=Time.now)
+    return false unless (t = @cas_tickets.delete(ticket))
+    return false unless (t[:t] + 15) > time
+    return t[:u] if t[:s] == service
+    false
+  end
+  def ticket_redir(username, service)
+    service+'?ticket='+ticket_make(username,service)
+  end
+
+  get('/cas/tickets') do
+    halt 404 if settings.production?
+    @cas_tickets.map{|k,v| "#{k} -> {time: #{v[:t]}, user: #{v[:u]}, service: #{v[:s]}}" }.join('<br>')
+  end
+
+  get('/cas/login') do # credential requestor / acceptor
+    session['renew'] = request['renew']
+    session['gateway'] = request['gateway'] unless session['renew'] # never show
+    if session['loggedin'] && !session['renew']
+      return redirect(ticket_redir(session['username'],request['service'])) if request['service']
+      return 'already logged in'
+    end
+    return redirect(session['service']) if session['gateway'] && session['service']
+    session['service'] = request['service']
+    # session['method'] = request['method'] # method to use for
+    # session['warn'] = request['warn'] # client must be prompted before being authenticated
+    '<a href=/>Acc over her</a>' +
+    '<form method=post action=/cas/login>' +
+      '<input name=username autofocus placeholder=user><br><input name=password type=password placeholder=password><br>' +
+      '<input name=2fa placeholder=2FA-Token><br><input type=submit>' +
+      # dunno why to do this
+      # (session['service'] ? '<input name=service type=hidden value="'+CGI::escapeHTML(session['service'])+'">' : '') +
+    '</form>'
+  end
+  post('/cas/login') do
+    halt 400, 'user missing' unless request['username']
+    halt 400, 'password missing' unless request['password']
+    authfail = $USERBACKEND.check_pw(request['username'], request['password'])
+    authfail ||= request['2fa'] != '' && !$USERBACKEND.check_totp(request['username'], request['2fa'])
+    halt 400, 'stahp' if authfail
+    USERS[request['username']][:totp][:last] = Time.now if request['2fa'] != ''
+    session['loggedin'] = true
+    session['username'] = request['username']
+    return redirect(ticket_redir(session['username'],session['service'])) if session['service']
+    'logged in'
+  end
+  get('/cas/logout') do # destroy CAS session (logout)
+    session.delete('loggedin')
+    'loggeddyouty'
+  end
+  get('/cas/validate') do # service ticket validation
+    halt 404, 'this looked unused, sorry'
+    halt 400, 'no' unless request['service']
+    halt 400, 'no' unless request['ticket']
+    u = ticket_validate(request['ticket'], request['service'])
+    return [200, {}, "yes\n#{u}"] if u
+    [200, {}, "no"]
+  end
+  get('/cas/serviceValidate') do # service ticket validation
+    u = ticket_validate(request['ticket'], request['service'])
+    case (request['format'] || 'xml').downcase
+    when "xml"
+      if u
+        [200, {'Content-Type'=>'application/xml'}, StringIO.new('<cas:serviceResponse xmlns:cas="http://www.yale.edu/tp/cas"><cas:authenticationSuccess><cas:user>'+u+'</cas:user><cas:attributes></cas:attributes></cas:authenticationSuccess></cas:serviceResponse>')]
+      else
+        [200, {'Content-Type'=>'application/xml'}, StringIO.new('<cas:serviceResponse xmlns:cas="http://www.yale.edu/tp/cas"><cas:authenticationFailure code="INVALID_TICKET"></cas:authenticationFailure></cas:serviceResponse>')]
+      end
+    when "json"
+      if u
+        [200, {'Content-Type'=>'application/json'}, StringIO.new('{"serviceResponse": "authenticationSuccess":{"user":"'+u+'","attributes":{}}}')]
+      else
+        [200, {'Content-Type'=>'application/xml'}, StringIO.new('{"serviceResponse":"authenticationFailure":{"code":"INVALID_TICKET","description":""}}')]
+      end
+    else
+      [200, {'Content-Type'=>'application/xml'}, StringIO.new('<cas:serviceResponse xmlns:cas="http://www.yale.edu/tp/cas"><cas:authenticationFailure code="INTERNAL_ERROR"></cas:authenticationFailure></cas:serviceResponse>')]
+    end
+  end
+  # get('/proxyValidate') do # service/proxy ticket validation [CAS 2.0]
+  #   halt 500, 'no'
+  # end
+  # get('/proxy') do # proxy ticket service [CAS 2.0]
+  # end
+  # get('/p3/serviceValidate') do # service ticket validation [CAS 3.0]
+  # end
+  # get('/p3/proxyValidate') do # service/proxy ticket validation [CAS 3.0]
+  # end
+end
