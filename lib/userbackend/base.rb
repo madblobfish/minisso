@@ -9,11 +9,17 @@ class UserBackendBase
   end
 
   # totp
-  def totp_valid?(secret, token, after=Time.now-60)
-    ROTP::TOTP.new(secret).verify(token, drift_behind: 15, after: after)
-  end
   def totp_new_secret
     secret = ROTP::Base32.random
     [secret, ROTP::TOTP.new(secret).provisioning_uri("MINICAS")]
+  end
+  def totp_valid?(secret, token, after=Time.now-60)
+    ROTP::TOTP.new(secret).verify(token, drift_behind: 15, after: after)
+  end
+  def check_totp(name, totp)
+    usr = fetch(name, {})
+    secret = usr.fetch(:totp, {s:'base32secret'})[:s]
+    last = usr.fetch(:totp, {}).fetch(:last, Time.now-60)
+    totp_valid?(secret, totp, last)
   end
 end

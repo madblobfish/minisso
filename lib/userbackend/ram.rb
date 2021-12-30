@@ -1,12 +1,28 @@
 class RamUserBackend < UserBackendBase
   def initialize(**opts)
-    @users = {"asd":{pw:"asd"}}
+    @users = {
+      "asd"=>{pw:"asd"},
+      "qwe"=>{pw:"qwe", totp:{last:Time.now, s:"FWKAKWNXUEHPIX5ZMTXRY7UJTNEDUPPF"}}
+    }
     super
   end
   def all
     @users.map{|k,v| "#{k}#{'*' if v.is_a?(Time)}"}
   end
 
+  def preregister(name)
+    # block username from being registered
+    @users[name] = Time.now
+  end
+  def clear_old_preregister(name)
+    @users.delete('name') if @users['name'].is_a?(Time) && @users['name']+120 <= Time.now
+  end
+  def clear_preregister(name)
+    @users.delete('name') if @users['name'].is_a?(Time)
+  end
+  def register(name, contents)
+    @users[name] = contents
+  end
   def exists?(name)
     clear_old_preregister(name)
     @users.key?(name)
@@ -15,25 +31,18 @@ class RamUserBackend < UserBackendBase
     clear_old_preregister(args.first)
     @users.fetch(*args)
   end
-  def check_totp(name, totp)
-    usr = fetch(name, {totp:{s:'base32secret'},last:Time.now})
-    secret = usr.fetch(:totp,{s:'base32secret'})[:s]
-    time = usr.fetch(:totp,{time:Time.now})[:time]
-    totp_valid?(secret, request['2fa'], time)
-  end
   def check_pw(name, pw)
-    @users.fetch(name, {pw:'nnnnnnnnnnnnnnn'})[:pw] == pw
+    return false unless @users.key?(name)
+    @users[name][:pw] == pw
   end
-  def preregister(name)
-    @users[name] = Time.now
+  def update_last_login(name)
+    @users[name][:totp][:last] = Time.now
   end
-  def register(name, contents)
-    @users[name] = contents
+  def cas_add_service(name, service)
+    @users[name][:cas_services] ||= []
+    @users[name][:cas_services] << value
   end
-  def clear_old_preregister(name)
-    @users.delete('name') if @users['name'].is_a?(Time) && @users['name']+120 <= Time.now
-  end
-  def clear_preregister(name)
-    @users.delete('name') if @users['name'].is_a?(Time)
+  def fetch_attr(name, *args)
+    @users[name].fetch(*args)
   end
 end

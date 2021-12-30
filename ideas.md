@@ -3,3 +3,4 @@
 * self managed groups (maybe with prefix only) with approval processes
 * pseudo and second accounts? (managed by a user)
 * get rid of XSSes
+* implement single logout

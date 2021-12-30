@@ -45,7 +45,7 @@ class MiniCAS < Sinatra::Base
     halt 403, 'registration not open' unless $USERBACKEND.registration_open?
     halt 400, 'BLAH! do better' unless session['registration_secret']
     halt 400, '2FA-Token missing' unless request['2fa']
-    if totp_valid?(session['registration_secret'], request['2fa'])
+    if $USERBACKEND.totp_valid?(session['registration_secret'], request['2fa'])
       $USERBACKEND.register(
         session['registration_name'],
         {pw:session['registration_password'], totp:{s:session['registration_secret'], last:Time.now-5}}

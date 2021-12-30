@@ -26,9 +26,24 @@ class CAS < ProtocolBase
     service+'?ticket='+ticket_make(username,service)
   end
 
+  def service_blocked?(service)
+    @hosts_allow ||= ENV.fetch('CAS_HOSTS_ALLOW', '').split(',')
+    @hosts_block ||= ENV.fetch('CAS_HOSTS_BLOCK', '').split(',')
+    @proto_allow ||= ENV.fetch('CAS_PROTO_ALLOW', 'http,https').split(',')
+    uri = URI(service)
+    return true unless @proto_allow.any?{|p| uri.scheme == p}
+    return true if @hosts_block.any?{|h| uri.host == h}
+    ! @hosts_allow.any?{|h| uri.host == h}
+  end
+
   get('/cas/tickets') do
     halt 404 if settings.production?
     @cas_tickets.map{|k,v| "#{k} -> {time: #{v[:t]}, user: #{v[:u]}, service: #{v[:s]}}" }.join('<br>')
+  end
+
+  get('/cas/sessions') do
+    return 'login first' unless session['loggedin']
+    session['cas_seen_services'].join('<br>')
   end
 
   get('/cas/login') do # credential requestor / acceptor
@@ -53,37 +68,49 @@ class CAS < ProtocolBase
   post('/cas/login') do
     halt 400, 'user missing' unless request['username']
     halt 400, 'password missing' unless request['password']
-    authfail = $USERBACKEND.check_pw(request['username'], request['password'])
+    authfail = !$USERBACKEND.check_pw(request['username'], request['password'])
     authfail ||= request['2fa'] != '' && !$USERBACKEND.check_totp(request['username'], request['2fa'])
     halt 400, 'stahp' if authfail
-    USERS[request['username']][:totp][:last] = Time.now if request['2fa'] != ''
+    $USERBACKEND.update_last_login(request['username']) if request['2fa'] != ''
     session['loggedin'] = true
     session['username'] = request['username']
-    return redirect(ticket_redir(session['username'],session['service'])) if session['service']
+    if session['service']
+      session['cas_seen_services'] ||= Set.new
+      session['cas_seen_services'] << session['service']
+      return redirect(ticket_redir(session['username'], session['service']))
+    end
     'logged in'
   end
   get('/cas/logout') do # destroy CAS session (logout)
+    services_triggered = []
+    session.fetch('cas_seen_services', []).each do |s|
+      services_triggered << s
+    end
     session.delete('loggedin')
-    'loggeddyouty'
+    return 'loggeddyouty completely' if services_triggered.empty?
+    'loggeddyouty but not from some services: ' + services_triggered.join(', ')
   end
   get('/cas/validate') do # service ticket validation
     halt 404, 'this looked unused, sorry'
     halt 400, 'no' unless request['service']
+    halt 400, 'no' if service_blocked?(request['service'])
     halt 400, 'no' unless request['ticket']
     u = ticket_validate(request['ticket'], request['service'])
     return [200, {}, "yes\n#{u}"] if u
-    [200, {}, "no"]
+    [200, {}, 'no']
   end
   get('/cas/serviceValidate') do # service ticket validation
+    halt 400, 'no' unless request['service']
+    halt 400, 'no' if service_blocked?(request['service'])
     u = ticket_validate(request['ticket'], request['service'])
     case (request['format'] || 'xml').downcase
-    when "xml"
+    when 'xml'
       if u
         [200, {'Content-Type'=>'application/xml'}, StringIO.new('<cas:serviceResponse xmlns:cas="http://www.yale.edu/tp/cas"><cas:authenticationSuccess><cas:user>'+u+'</cas:user><cas:attributes></cas:attributes></cas:authenticationSuccess></cas:serviceResponse>')]
       else
         [200, {'Content-Type'=>'application/xml'}, StringIO.new('<cas:serviceResponse xmlns:cas="http://www.yale.edu/tp/cas"><cas:authenticationFailure code="INVALID_TICKET"></cas:authenticationFailure></cas:serviceResponse>')]
       end
-    when "json"
+    when 'json'
       if u
         [200, {'Content-Type'=>'application/json'}, StringIO.new('{"serviceResponse": "authenticationSuccess":{"user":"'+u+'","attributes":{}}}')]
       else
