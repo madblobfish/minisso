@@ -1,0 +1,12 @@
+- content_for :title do
+  Login
+%a(href="/")
+  Get an Account over here
+%form(method="post" action="/cas/login")
+  %input(name="username" autofocus placeholder="user")
+  %br
+  %input(name="password" type="password" placeholder="password")
+  %br
+  %input(name="2fa" placeholder="2FA-Token (you should know when to use it and when not :P")
+  %br
+  %input(type="submit")

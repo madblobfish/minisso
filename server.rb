@@ -1,4 +1,7 @@
 require 'sinatra/base'
+require 'sinatra/content_for'
+require 'sinatra/reloader'
+require 'sinatra/namespace'
 require 'webrick'
 require 'webrick/https'
 require 'securerandom'
@@ -11,6 +14,7 @@ Dir["./lib/{protocol,userbackend}/*.rb"].each {|file| require file }
 $USERBACKEND = Object.const_get(ENV.fetch('MINICAS_USERBACKEND', 'RamUserBackend')).new
 
 class MiniCAS < Sinatra::Base
+  register Sinatra::Namespace
   ENV.fetch('MINICAS_EXTENSIONS', ProtocolBase.implementations_str).split(':').each{|x| use Object.const_get(x)}
 
   # account/group managament
@@ -52,12 +56,30 @@ class MiniCAS < Sinatra::Base
     end
   end
 
-  get('/list-users') do
-    $USERBACKEND.all.join('<br>')
+  namespace('/admin') do
+    before{halt 403, 'no' unless session['loggedin']}
+    get('/') do
+      'welcome admin!'
+    end
+    post('/registration') do
+      halt 403, 'no' unless session['loggedin']
+      if request['enable']
+        $USERBACKEND.registration_open()
+        return 'opened'
+      else
+        $USERBACKEND.registration_close()
+        return 'closed'
+      end
+    end
+    get('/list-users') do
+      halt 403, 'no' unless session['loggedin']
+      $USERBACKEND.all.map{|e| CGI.escapeHTML(e)}.join('<br>')
+    end
   end
 
   set :sessions, secret: SecureRandom.hex(32), key: '__Host-Session', path: '/', secure: true
   set :session_store, Rack::Session::Pool
+  set :haml, :layout => :base
 end
 
 if not File.exists?('./server.key') and not File.exists?('./server.pem')

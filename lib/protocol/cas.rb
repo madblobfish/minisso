@@ -57,13 +57,7 @@ class CAS < ProtocolBase
     session['service'] = request['service']
     # session['method'] = request['method'] # method to use for
     # session['warn'] = request['warn'] # client must be prompted before being authenticated
-    '<a href=/>Acc over her</a>' +
-    '<form method=post action=/cas/login>' +
-      '<input name=username autofocus placeholder=user><br><input name=password type=password placeholder=password><br>' +
-      '<input name=2fa placeholder=2FA-Token><br><input type=submit>' +
-      # dunno why to do this
-      # (session['service'] ? '<input name=service type=hidden value="'+CGI::escapeHTML(session['service'])+'">' : '') +
-    '</form>'
+    haml 'login'
   end
   post('/cas/login') do
     halt 400, 'user missing' unless request['username']

@@ -1,0 +1,17 @@
+!!! 5
+%html
+	%head
+		%title
+			MiniCAS -
+			= yield_content :title
+		:css
+			html,body{width:100%;height:100%}
+			.content{
+				text-align:center;
+			}
+		= yield_content :head
+	%body
+		%h1
+			MiniCAS
+		.content
+			= yield
