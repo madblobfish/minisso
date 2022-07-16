@@ -1,6 +1,7 @@
 require 'sinatra'
 require 'rack-cas'
 require 'rack/cas'
+require 'cgi'
 
 set :sessions, path: '/', secret: SecureRandom.hex(32) #, key: '__Host-Session', secure: true
 use Rack::CAS, server_url: 'https://localhost:8081/cas', verify_ssl_cert: false
@@ -18,7 +19,7 @@ end
 
 get('/login') do
   '<a href=logout>logout here</a>' +
-  session['cas'].inspect
+  CGI.escapeHTML(session['cas'].inspect)
 end
 
 get('/') do
