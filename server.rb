@@ -57,6 +57,11 @@ class MiniCAS < Sinatra::Base
   end
 
   set :sessions, secret: SecureRandom.hex(32), key: '__Host-Session', path: '/', secure: true
+  set :session_store, Rack::Session::Pool
+end
+
+if not File.exists?('./server.key') and not File.exists?('./server.pem')
+  `openssl req -new -x509 -newkey rsa:4096 -sha256 -nodes -days #{10*356} -keyout server.key -out server.pem -subj '/'`
 end
 
 Rack::Handler::WEBrick.run MiniCAS, **{

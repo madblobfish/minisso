@@ -8,6 +8,13 @@ class UserBackendBase
     @registration_open
   end
 
+  def registration_close
+    @registration_open = false
+  end
+  def registration_open
+    @registration_open = true
+  end
+
   # totp
   def totp_new_secret
     secret = ROTP::Base32.random
