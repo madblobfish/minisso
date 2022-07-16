@@ -3,6 +3,8 @@ require 'webrick'
 require 'webrick/https'
 require 'securerandom'
 require 'openssl'
+require 'cgi'
+require 'haml'
 
 # load protocols and userbackends
 Dir["./lib/{protocol,userbackend}/*.rb"].each {|file| require file }
@@ -13,11 +15,7 @@ class MiniCAS < Sinatra::Base
 
   # account/group managament
   get('/') do
-    return 'hi, sadly registration is not open' unless $USERBACKEND.registration_open?
-    '<h2>Register?</h2><form method=post action=/register>' +
-      '<input name=name  autofocus placeholder=user><br><input name=pw type=password placeholder=password><br>' +
-      '<label>2FA<input name=2fa type=checkbox value=yes></label><br><input type=submit>' +
-    '</form>'
+    haml :index
   end
   get('/qr.js') do
     [200, {'Content-Type'=>'application/javascript'}, File.read('./qr.js')]
@@ -32,13 +30,10 @@ class MiniCAS < Sinatra::Base
       session['registration_name'] = request['name']
       session['registration_password'] = request['pw']
       session['registration_secret'], url = $USERBACKEND.totp_new_secret
-      '<style>svg{width:400px}</style><a href="'+url+'">TODO QRCODE HERE</a><br><br>' +
-      '<form method=post action=/register-verify-2fa>' +
-        '<input name=2fa autofocus placeholder=2FA-Token><br><input type=submit>' +
-      '</form><script src=/qr.js></script>'
+      haml :register_2fa
     else
       $USERBACKEND.register(request['name'], {pw:request['pw']})
-      'yo gotta account'
+      haml :register_success
     end
   end
   post('/register-verify-2fa') do
@@ -50,9 +45,9 @@ class MiniCAS < Sinatra::Base
         session['registration_name'],
         {pw:session['registration_password'], totp:{s:session['registration_secret'], last:Time.now-5}}
       )
-      'sucessifullies'
+      haml :register_success
     else
-      'bad 2FA-Token, <a href=/>try again</>'
+      haml :register_bad
       $USERBACKEND.clear_preregister(session['registration_name']) if session['registration_name']
     end
   end
@@ -72,4 +67,3 @@ Rack::Handler::WEBrick.run MiniCAS, **{
   :SSLPrivateKey  => OpenSSL::PKey::RSA.new(        File.read('./server.key')),
   :SSLCertName    => [['CN', 'localhost']]
 }
-

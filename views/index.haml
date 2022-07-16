@@ -1,0 +1,15 @@
+%h2
+  Register?
+- if $USERBACKEND.registration_open?
+  %form(method="post" action="/register")
+    %input(name="name" autofocus placeholder="user")
+    %br
+    %input(name="pw" type="password" placeholder="password")
+    %br
+    %label
+      2FA
+      %input(name="2fa" type="checkbox" value="yes")
+    %br
+    %input(type="submit")
+- else
+  hi, sadly registration is not open

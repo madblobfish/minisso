@@ -1,0 +1,11 @@
+:css
+  svg{width:400px}
+%a(href=@url)
+  TODO QRCODE HERE
+%br
+%br
+%form(method="post" action="/register-verify-2fa")
+  %input(name="2fa" autofocus placeholder="2FA-Token")
+  %br
+  %input(type=submit)
+%script(src="/qr.js")
