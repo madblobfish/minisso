@@ -11,11 +11,12 @@ require 'haml'
 
 # load protocols and userbackends
 Dir["./lib/{protocol,userbackend}/*.rb"].each {|file| require file }
-$USERBACKEND = Object.const_get(ENV.fetch('MINICAS_USERBACKEND', 'RamUserBackend')).new
+$USERBACKEND = Object.const_get(ENV.fetch('MINISSO_USERBACKEND', 'RamUserBackend')).new
 
-class MiniCAS < Sinatra::Base
+class MiniSSO < Sinatra::Base
+  helpers Sinatra::ContentFor
   register Sinatra::Namespace
-  ENV.fetch('MINICAS_EXTENSIONS', ProtocolBase.implementations_str).split(':').each{|x| use Object.const_get(x)}
+  ENV.fetch('MINISSO_PROTOCOLS', ProtocolBase.implementations_str).split(':').each{|x| use Object.const_get(x)}
 
   # account/group managament
   get('/') do
@@ -33,8 +34,8 @@ class MiniCAS < Sinatra::Base
       $USERBACKEND.preregister(request['name'])
       session['registration_name'] = request['name']
       session['registration_password'] = request['pw']
-      session['registration_secret'], url = $USERBACKEND.totp_new_secret
-      haml :register_2fa
+      session['registration_secret'], otpurl = $USERBACKEND.totp_new_secret
+      haml :register_2fa, locals: {otpurl: otpurl}
     else
       $USERBACKEND.register(request['name'], {pw:request['pw']})
       haml :register_success
@@ -63,7 +64,7 @@ class MiniCAS < Sinatra::Base
     end
     post('/registration') do
       halt 403, 'no' unless session['loggedin']
-      if request['enable']
+      if request.has_key?('enable') && request['enable'] == 'yes'
         $USERBACKEND.registration_open()
         return 'opened'
       else
@@ -77,7 +78,7 @@ class MiniCAS < Sinatra::Base
     end
   end
 
-  set :sessions, secret: SecureRandom.hex(32), key: '__Host-Session', path: '/', secure: true
+  set :sessions, secret: SecureRandom.hex(32), key: '__Host-Session', path: '/', secure: true, same_site: :lax
   set :session_store, Rack::Session::Pool
   set :haml, :layout => :base
 end
@@ -86,7 +87,7 @@ if not File.exists?('./server.key') and not File.exists?('./server.pem')
   `openssl req -new -x509 -newkey rsa:4096 -sha256 -nodes -days #{10*356} -keyout server.key -out server.pem -subj '/'`
 end
 
-Rack::Handler::WEBrick.run MiniCAS, **{
+Rack::Handler::WEBrick.run MiniSSO, **{
   :DocumentRoot   => '/tmp/no',
   :Port           => 8081,
   :SSLEnable      => true,

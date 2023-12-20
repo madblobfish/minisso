@@ -18,7 +18,7 @@ class UserBackendBase
   # totp
   def totp_new_secret
     secret = ROTP::Base32.random
-    [secret, ROTP::TOTP.new(secret).provisioning_uri("MINICAS")]
+    [secret, ROTP::TOTP.new(secret).provisioning_uri("MINISSO")]
   end
   def totp_valid?(secret, token, after=Time.now-60)
     ROTP::TOTP.new(secret).verify(token, drift_behind: 15, after: after)
