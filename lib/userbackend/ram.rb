@@ -35,8 +35,10 @@ class RamUserBackend < UserBackendBase
     return false unless @users.key?(name)
     @users[name][:pw] == pw
   end
-  def update_last_login(name)
-    @users[name][:totp][:last] = Time.now
+  def update_last_login(name, method, totp = false)
+    @users[name][:totp][:last] = Time.now if totp
+    @users[name][:last] ||= {}
+    @users[name][:last][:last_method] = method
   end
   def cas_add_service(name, service)
     @users[name][:cas_services] ||= []

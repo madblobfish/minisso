@@ -176,7 +176,6 @@ loop do
         $USERBACKEND = RamUserBackend.new
         if authed = $USERBACKEND.check_pw(message.contents[:bind_dn], message.contents[:password])
           client.print(LDAPMessage.compose_response(message.id, :bindResponse))
-          $USERBACKEND.update_last_login(message.contents[:bind_dn], 'LDAP')
           puts "good"
         else
           client.print(LDAPMessage.compose_response(message.id, :bindResponse, :invalidCredentials))

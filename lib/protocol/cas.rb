@@ -66,7 +66,7 @@ class CAS < ProtocolBase
       authfail = !$USERBACKEND.check_pw(request['username'], request['password'])
       authfail ||= request['2fa'] != '' && !$USERBACKEND.check_totp(request['username'], request['2fa'])
       halt 400, 'stahp' if authfail
-      $USERBACKEND.update_last_login(request['username']) if request['2fa'] != ''
+      $USERBACKEND.update_last_login(request['username'], 'CAS', true) if request['2fa'] != ''
       session['loggedin'] = true
       session['username'] = request['username']
       if session['service']
