@@ -11,3 +11,4 @@
 * ca integration? https://github.com/hashicorp/vault, https://github.com/smallstep/certificates
 * async https://github.com/socketry/async-http, https://github.com/socketry/async
 * implement fido2
+* password policy

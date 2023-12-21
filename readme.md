@@ -29,4 +29,8 @@ You can modify the behavior using the following env vars:
 	* integrate at least two more backends
 	* route logins better internal
 	* manage permissions selfhosted
+* cleanup webserver integration
+	* it was meant to run somewhat secure out of the box... maybe provide a setup script for that usecase instead
+* bruteforce protection?
+	* multistaged (per user, per IP, ...)
 * ???
